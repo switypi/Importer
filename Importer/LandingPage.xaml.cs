@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.ServiceModel;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -13,6 +15,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Xml.Linq;
 
 namespace Importer
 {
@@ -23,6 +26,7 @@ namespace Importer
     {
         #region private variables
         Microsoft.Win32.OpenFileDialog openDialog;
+        private const string keyForService = "S-F119DA0F-A768-4D2C-A802-5C635F084F9C";
 
         #endregion
 
@@ -31,12 +35,15 @@ namespace Importer
             InitializeComponent();
 
         }
+
         #region Properties
         private bool IsFileValid { get; set; }
 
         private bool IsFileProcessed { get; set; }
 
         private bool IsValidEmail { get; set; }
+
+        private List<string> Records { get; set; }
         #endregion
 
         /// <summary>
@@ -86,8 +93,63 @@ namespace Importer
 
             if (IsFileValid)
             {
-                //Need to invoke webservice to check the account.
+                CheckUserAccountExists();
             }
+
+        }
+
+        private void CheckUserAccountExists()
+        {
+            //Check whether account exists for each email address.
+            int emailColIndex = -1;
+            string[] columns;
+            string Role = string.Empty;
+            bool Response = false;
+
+            foreach (var item in Records)
+            {
+                int index = Records.IndexOf(item);
+                if (index != 0)//leave 0th line as that is for column header.
+                {
+
+                    var emailData = item.Split(',')[emailColIndex];
+
+                    string service = "http://s-cris.nelsonnet.com.au/AuthService/CheckUserIdExists/" + emailData + "," + keyForService;
+
+                    WebClient proxyClient = new WebClient();
+                    var result = proxyClient.DownloadString(service);
+                    XElement doc = XElement.Parse(result);
+
+                    foreach (var dataItem in doc.Elements())
+                    {
+                        switch (dataItem.Name.LocalName)
+                        {
+                            case "Response":
+                                Response = bool.Parse(dataItem.Value);
+                                break;
+                            case "ResultCode":
+                                break;
+                            case "ResultDescription":
+                                break;
+                            case "Role":
+                                Role = dataItem.Value;
+                                break;
+                        }
+                    }
+
+
+                }
+                else
+                {
+                    columns = item.Split(';');
+                    var emailCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Email"));
+                    emailColIndex = columns[0].Split(',').ToList().IndexOf(emailCol);
+                }
+            }
+        }
+
+        private void proxyClient_DownloadStringCompleted(object sender, DownloadStringCompletedEventArgs e)
+        {
 
         }
 
@@ -102,6 +164,8 @@ namespace Importer
             if (openDialog != null && openDialog.SafeFileName.Length > 0)
             {
                 string[] totalNumberOfLines = File.ReadAllLines(fileName);
+
+                Records = totalNumberOfLines.ToList();
                 //Get the number of columns.
                 string[] columns = totalNumberOfLines[0].Split(';');
                 //
