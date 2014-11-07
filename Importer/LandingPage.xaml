@@ -1,8 +1,10 @@
 ﻿<Window x:Class="Importer.LandingPage"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
         Title="Importer" Height="350" Width="525">
     <Grid Background="LightGray" >
+        
         <Grid HorizontalAlignment="Center">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
@@ -23,9 +25,11 @@
 
                 <Button Content="Validate" Click="btnValidate_Click"  Height="30" Width="60"  Margin="10,0,0,0"></Button>
                 <Button Content="Process"  Click="btnProcess_Click" Height="30" Width="60" Margin="10,0,0,0"></Button>
+                
             </StackPanel>
-        </Grid>
-       
 
+        </Grid>
+
+        <xctk:BusyIndicator x:Name="busyIndicator"  ></xctk:BusyIndicator>
     </Grid>
 </Window>
