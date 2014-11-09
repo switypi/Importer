@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.ServiceModel;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -25,29 +26,44 @@ namespace Importer
     /// </summary>
     public partial class LandingPage : Window
     {
-        #region private variables
+        #region Private variables
         Microsoft.Win32.OpenFileDialog openDialog;
         private const string keyForService = "S-F119DA0F-A768-4D2C-A802-5C635F084F9C";
+        private const string accountCheckService = "http://s-cris.nelsonnet.com.au/AuthService/CheckUserIdExists/";
+        private const string accountCreationService = "http://s-cris.nelsonnet.com.au/AuthService/CreateStudentAccount/";
         BackgroundWorker backgroundThread;
         #endregion
 
+        #region Page Constructor
         public LandingPage()
         {
             InitializeComponent();
             LogFileSetting();
 
         }
+        #endregion
 
         #region Properties
+        /// <summary>
+        /// Is file valid to process
+        /// </summary>
         private bool IsFileValid { get; set; }
-
+        /// <summary>
+        /// is file validated.
+        /// </summary>
         private bool IsFileProcessed { get; set; }
-
+        /// <summary>
+        /// Is email valid.
+        /// </summary>
         private bool IsValidEmail { get; set; }
-
+        /// <summary>
+        /// Number of records in csv file.
+        /// </summary>
         private List<string> Records { get; set; }
 
         #endregion
+
+        #region Methods
 
         /// <summary>
         /// Open the csv file selector.
@@ -103,17 +119,39 @@ namespace Importer
 
         }
 
+        /// <summary>
+        /// Background thread doWork
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void backgroundThread_DoWork(object sender, DoWorkEventArgs e)
         {
-
             ProcessRecordsInFile();
         }
 
+        /// <summary>
+        /// Notification from bakcground thread when it completes action.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void backgroundThread_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             busyIndicator.IsBusy = false;
+            if (e.Error == null)
+                MessageBox.Show("Import successful.");
+            else
+            {
+
+                WriteErrorMessageToLog(e.Error.Message);
+                string filename = AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day;
+                MessageBox.Show("Some error has occured while importing data.Check the log file with name " + filename + " at " + AppDomain.CurrentDomain.BaseDirectory);
+            }
+
         }
 
+        /// <summary>
+        /// Process data in imported file.
+        /// </summary>
         private void ProcessRecordsInFile()
         {
             //Check whether account exists for each email address.
@@ -135,7 +173,7 @@ namespace Importer
 
                     var emailData = item.Split(',')[emailColIndex];
 
-                    string service = "http://s-cris.nelsonnet.com.au/AuthService/CheckUserIdExists/" + emailData + "," + keyForService;
+                    string service = accountCheckService + emailData + "," + keyForService;
                     try
                     {
                         var result = proxyClient.DownloadString(service);
@@ -171,6 +209,7 @@ namespace Importer
                 }
                 else
                 {
+                    //Get the header column index of each column.
                     columns = item.Split(';');
                     var emailCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Email", StringComparison.InvariantCultureIgnoreCase));
                     emailColIndex = columns[0].Split(',').ToList().IndexOf(emailCol);
@@ -215,7 +254,7 @@ namespace Importer
             {
                 try
                 {
-                    string userAccounService = "http://s-cris.nelsonnet.com.au/AuthService/CreateStudentAccount/" + emailData + "," + Password + "," + firstName + "," + lastName + "," + keyForService;
+                    string userAccounService = accountCreationService + emailData + "," + Password + "," + firstName + "," + lastName + "," + keyForService;
                     var accountData = proxyClient.DownloadString(userAccounService);
 
                     doc = XElement.Parse(accountData);
@@ -281,10 +320,12 @@ namespace Importer
                 {
                     var emailData = totalNumberOfLines[iCnt].Split(',')[emailColIndex];
                     //Check emiail validity
-                    var validEmailExist = emailData.Contains("@");
+                    var validEmailExist = IsValidEmailAddressByRegex(emailData);
                     if (validEmailExist)
-
+                    {
                         IsValidEmail = true;
+
+                    }
                     else
                     {
                         IsValidEmail = false;
@@ -312,24 +353,58 @@ namespace Importer
             }
         }
 
+        /// <summary>
+        /// Write log in a log file.
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="lineNumber"></param>
         private void WriteMessageToLog(string message, int lineNumber)
         {
-            LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, lineNumber != 0 ? "Line " + lineNumber +": "+ message :"");
+            LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, lineNumber != 0 ? "Line " + lineNumber + ": " + message : "");
         }
 
+        /// <summary>
+        /// Write error messages to log file
+        /// </summary>
+        /// <param name="message"></param>
         private void WriteErrorMessageToLog(string message)
         {
             LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, message);
         }
 
+        /// <summary>
+        /// Is email is valid.
+        /// </summary>
+        /// <param name="mailAddress"></param>
+        /// <returns></returns>
+        public bool IsValidEmailAddressByRegex(string mailAddress)
+        {
+            Regex mailIDPattern = new Regex(@"[\w-]+@([\w-]+\.)+[\w-]+");
+
+            if (!string.IsNullOrEmpty(mailAddress) && mailIDPattern.IsMatch(mailAddress))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Default settings for the log file.
+        /// </summary>
         private void LogFileSetting()
         {
+
             WriteMessageToLog("", 0);
             WriteMessageToLog("", 0);
             WriteMessageToLog("", 0);
             WriteMessageToLog("Log start time: " + DateTime.Now + "------------------------", 0);
             WriteMessageToLog("", 0);
         }
+
+        #endregion
 
 
     }
