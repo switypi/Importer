@@ -337,6 +337,7 @@ namespace Importer
         /// 
         private void DoFileValidation(string fileName)
         {
+            this.logger.LogInfo("File validation is being done.");
             if (openDialog != null && openDialog.SafeFileName.Length > 0)
             {
                 string[] totalNumberOfLines = File.ReadAllLines(fileName);
@@ -362,7 +363,6 @@ namespace Importer
                     {
                         IsValidEmail = false;
                         WriteMessageToLog("email is not correct", iCnt,ErrorType.Error);
-
                         break;
                     }
 
