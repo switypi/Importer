@@ -31,6 +31,7 @@ namespace Importer
         private const string keyForService = "S-F119DA0F-A768-4D2C-A802-5C635F084F9C";
         private const string accountCheckService = "http://s-cris.nelsonnet.com.au/AuthService/CheckUserIdExists/";
         private const string accountCreationService = "http://s-cris.nelsonnet.com.au/AuthService/CreateStudentAccount/";
+        private const string roleService = "http://s-cris.nelsonnet.com.au/AuthService/ConsumeAccessCode/";
         BackgroundWorker backgroundThread;
         #endregion
 
@@ -150,6 +151,28 @@ namespace Importer
         }
 
         /// <summary>
+        /// Create role for user.
+        /// </summary>
+        private void CreateRoleForUser(string email, string IACCode, WebClient proxyClient, int index)
+        {
+            string service = roleService + email + "," + IACCode + "," + keyForService;
+            var response = proxyClient.DownloadString(service);
+
+            XElement doc = XElement.Parse(response);
+            var responseobject = doc.Elements().FirstOrDefault(c => c.Name.LocalName == "ResultCode");
+            if (responseobject != null)
+                if (responseobject.Value == "0")
+                {
+                    WriteMessageToLog("Role creation is successfull", index);
+
+                }
+                else
+                {
+                    WriteMessageToLog("Role could not be created", index);
+                }
+        }
+
+        /// <summary>
         /// Process data in imported file.
         /// </summary>
         private void ProcessRecordsInFile()
@@ -188,16 +211,22 @@ namespace Importer
                                 if (isSuccess)
                                 {
                                     var iacData = item.Split(',')[iAcColIndex];
-                                    //if(!string.IsNullOrEmpty(iacData))
-                                    //TODO: next processing.
+                                    //Create user role
+                                    foreach (var iacItem in iacData.Split('|').ToList())
+                                    {
+                                        CreateRoleForUser(emailData, iacItem, proxyClient, index);
+                                    }
                                 }
                             }
                             else
                             {
                                 WriteMessageToLog("Account exists.", index + 1);
                                 var iacData = item.Split(',')[iAcColIndex];
-                                //if(!string.IsNullOrEmpty(iacData))
-                                //TODO: next processing.
+                                //Create user role
+                                foreach (var iacItem in iacData.Split('|').ToList())
+                                {
+                                    CreateRoleForUser(emailData, iacItem, proxyClient, index);
+                                }
                             }
                     }
                     catch (Exception ex)
