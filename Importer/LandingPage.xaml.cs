@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.ServiceModel;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -28,6 +29,7 @@ namespace Importer
     {
         #region Private variables
         Microsoft.Win32.OpenFileDialog openDialog;
+        private LogWriter logger;
         private const string keyForService = "S-F119DA0F-A768-4D2C-A802-5C635F084F9C";
         private const string accountCheckService = "http://s-cris.nelsonnet.com.au/AuthService/CheckUserIdExists/";
         private const string accountCreationService = "http://s-cris.nelsonnet.com.au/AuthService/CreateStudentAccount/";
@@ -40,7 +42,7 @@ namespace Importer
         {
             InitializeComponent();
             LogFileSetting();
-
+           
         }
         #endregion
 
@@ -143,7 +145,7 @@ namespace Importer
             else
             {
 
-                WriteErrorMessageToLog(e.Error.Message);
+                WriteErrorMessageToLog(e.Error.Message,e.Error);
                 string filename = AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day;
                 MessageBox.Show("Some error has occured while importing data.Check the log file with name " + filename + " at " + AppDomain.CurrentDomain.BaseDirectory);
             }
@@ -163,12 +165,12 @@ namespace Importer
             if (responseobject != null)
                 if (responseobject.Value == "0")
                 {
-                    WriteMessageToLog("Role creation is successfull", index);
+                    WriteMessageToLog("Role creation is successfull", index, ErrorType.Info);
 
                 }
                 else
                 {
-                    WriteMessageToLog("Role could not be created", index);
+                    WriteMessageToLog("Role could not be created", index, ErrorType.Error);
                 }
         }
 
@@ -206,7 +208,7 @@ namespace Importer
                         if (resultobject != null)
                             if (!bool.Parse(resultobject.Value))
                             {
-                                WriteMessageToLog("Account is not mapped", index + 1);
+                                WriteMessageToLog("Account is not mapped", index + 1, ErrorType.Error);
                                 bool isSuccess = CreateUserAccount(firstNameColIndex, lastNameColIndex, passwordColIndex, proxyClient, doc, item, index, emailData);
                                 if (isSuccess)
                                 {
@@ -220,7 +222,7 @@ namespace Importer
                             }
                             else
                             {
-                                WriteMessageToLog("Account exists.", index + 1);
+                                WriteMessageToLog("Account exists.", index + 1, ErrorType.Error);
                                 var iacData = item.Split(',')[iAcColIndex];
                                 //Create user role
                                 foreach (var iacItem in iacData.Split('|').ToList())
@@ -231,8 +233,9 @@ namespace Importer
                     }
                     catch (Exception ex)
                     {
-                        WriteMessageToLog("Could not able to proceede.Some error has occured..", index + 1);
-                        WriteErrorMessageToLog(ex.Message);
+                        WriteMessageToLog("Could not able to proceede.Some error has occured..", index + 1,ErrorType.Error);
+                        WriteErrorMessageToLog(ex.Message,ex);
+                        throw ex;
                     }
 
                 }
@@ -291,12 +294,12 @@ namespace Importer
                     if (responseobject != null)
                         if (responseobject.Value == "Success")
                         {
-                            WriteMessageToLog("Account creation is successfull", index);
+                            WriteMessageToLog("Account creation is successfull", index, ErrorType.Info);
                             isAccountCreated = true;
                         }
                         else
                         {
-                            WriteMessageToLog("Account could not be created", index);
+                            WriteMessageToLog("Account could not be created", index,ErrorType.Error);
                         }
                 }
                 catch (Exception ex)
@@ -305,7 +308,7 @@ namespace Importer
                 }
             }
             else//if any information is missing then log it.
-                WriteMessageToLog("Data is missing", index);
+                WriteMessageToLog("Data is missing", index,ErrorType.Error);
 
             return isAccountCreated;
         }
@@ -358,7 +361,7 @@ namespace Importer
                     else
                     {
                         IsValidEmail = false;
-                        WriteMessageToLog("email is not correct", iCnt);
+                        WriteMessageToLog("email is not correct", iCnt,ErrorType.Error);
 
                         break;
                     }
@@ -387,18 +390,29 @@ namespace Importer
         /// </summary>
         /// <param name="message"></param>
         /// <param name="lineNumber"></param>
-        private void WriteMessageToLog(string message, int lineNumber)
+        private void WriteMessageToLog(string message, int lineNumber,ErrorType errorType)
         {
-            LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, lineNumber != 0 ? "Line " + lineNumber + ": " + message : "");
+            switch(errorType)
+            {
+                case ErrorType.Error:
+                    this.logger.LogError(message+" at " + lineNumber);
+                    break;
+                case ErrorType.Info:
+                    this.logger.LogInfo(message+" at " + lineNumber);
+                    break;
+
+            }
+            //this.logger..WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, lineNumber != 0 ? "Line " + lineNumber + ": " + message : "");
         }
 
         /// <summary>
         /// Write error messages to log file
         /// </summary>
         /// <param name="message"></param>
-        private void WriteErrorMessageToLog(string message)
+        private void WriteErrorMessageToLog(string msg, Exception ex)
         {
-            LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, message);
+            this.logger.LogError(msg, ex);
+           // LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, message);
         }
 
         /// <summary>
@@ -425,12 +439,10 @@ namespace Importer
         /// </summary>
         private void LogFileSetting()
         {
-
-            WriteMessageToLog("", 0);
-            WriteMessageToLog("", 0);
-            WriteMessageToLog("", 0);
-            WriteMessageToLog("Log start time: " + DateTime.Now + "------------------------", 0);
-            WriteMessageToLog("", 0);
+            
+            this.logger = new LogWriter(MethodBase.GetCurrentMethod().DeclaringType);
+            this.logger.LogInfo("Logger started");
+          
         }
 
         #endregion
