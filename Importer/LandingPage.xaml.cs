@@ -42,7 +42,7 @@ namespace Importer
         {
             InitializeComponent();
             LogFileSetting();
-           
+
         }
         #endregion
 
@@ -63,6 +63,8 @@ namespace Importer
         /// Number of records in csv file.
         /// </summary>
         private List<string> Records { get; set; }
+
+        private bool IsAllTheRecordSucceeded { get; set; }
 
         #endregion
 
@@ -98,7 +100,17 @@ namespace Importer
         /// <param name="e"></param>
         private void btnValidate_Click(object sender, RoutedEventArgs e)
         {
-            DoFileValidation(openDialog.FileName);
+            if (openDialog != null && openDialog.FileName != "")
+            {
+                if (backgroundThread == null)
+                    backgroundThread = new BackgroundWorker();
+                backgroundThread.DoWork += backgroundThread_DoEmailValidation;
+                backgroundThread.RunWorkerCompleted += backgroundThread_RunEmailValidationCompleted;
+                backgroundThread.RunWorkerAsync();
+                busyIndicator.IsBusy = true;
+            }
+            else
+                MessageBox.Show("Please select a file to validate.");
         }
 
         /// <summary>
@@ -108,18 +120,34 @@ namespace Importer
         /// <param name="e"></param>
         private void btnProcess_Click(object sender, RoutedEventArgs e)
         {
-            if (!IsFileProcessed)
-                DoFileValidation(openDialog.FileName);
-
-            if (IsFileValid)
+            if (openDialog != null && openDialog.FileName != "")
             {
-                backgroundThread = new BackgroundWorker();
+                if (backgroundThread == null)
+                    backgroundThread = new BackgroundWorker();
+
                 backgroundThread.RunWorkerCompleted += backgroundThread_RunWorkerCompleted;
                 backgroundThread.DoWork += backgroundThread_DoWork;
                 backgroundThread.RunWorkerAsync();
                 busyIndicator.IsBusy = true;
+                IsAllTheRecordSucceeded = true;
             }
+            else
+                MessageBox.Show("Please select a file to process.");
 
+
+        }
+
+        /// <summary>
+        /// Email validation thread start.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void backgroundThread_DoEmailValidation(object sender, DoWorkEventArgs e)
+        {
+            if (openDialog != null)
+                DoFileValidation(openDialog.FileName);
+            else
+                MessageBox.Show("Please select a file to validate.");
         }
 
         /// <summary>
@@ -129,7 +157,24 @@ namespace Importer
         /// <param name="e"></param>
         private void backgroundThread_DoWork(object sender, DoWorkEventArgs e)
         {
-            ProcessRecordsInFile();
+            if (!IsFileProcessed)
+                DoFileValidation(openDialog.FileName);
+            if (IsFileValid)
+            {
+                ProcessRecordsInFile();
+            }
+        }
+
+        /// <summary>
+        /// Email validation thread completes.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void backgroundThread_RunEmailValidationCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            busyIndicator.IsBusy = false;
+            backgroundThread.DoWork -= backgroundThread_DoEmailValidation;
+            backgroundThread.RunWorkerCompleted -= backgroundThread_RunEmailValidationCompleted;
         }
 
         /// <summary>
@@ -140,16 +185,25 @@ namespace Importer
         private void backgroundThread_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             busyIndicator.IsBusy = false;
-            if (e.Error == null)
-                MessageBox.Show("Import successful.");
-            else
+            if (IsFileValid)
             {
+                if (e.Error == null && IsAllTheRecordSucceeded==true)
+                    MessageBox.Show("Import successful.");
+                    else if(e.Error == null && IsAllTheRecordSucceeded==false)
+                    MessageBox.Show("All records could not be processed successfully."+Environment.NewLine+" Please check log file created at " + AppDomain.CurrentDomain.BaseDirectory);
+                else
+                {
 
-                WriteErrorMessageToLog(e.Error.Message,e.Error);
-                string filename = AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day;
-                MessageBox.Show("Some error has occured while importing data.Check the log file with name " + filename + " at " + AppDomain.CurrentDomain.BaseDirectory);
+                    WriteErrorMessageToLog(e.Error.Message, e.Error);
+                    //string filename = AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day;
+                    MessageBox.Show("Some error has occured while importing data.Check the log file created at " + AppDomain.CurrentDomain.BaseDirectory);
+                }
+
             }
-
+            openDialog.Reset();
+            txtFileName.Text = string.Empty;
+            backgroundThread.DoWork -= backgroundThread_DoWork;
+            backgroundThread.RunWorkerCompleted -= backgroundThread_RunWorkerCompleted;
         }
 
         /// <summary>
@@ -165,12 +219,13 @@ namespace Importer
             if (responseobject != null)
                 if (responseobject.Value == "0")
                 {
-                    WriteMessageToLog("Role creation is successfull", index, ErrorType.Info);
+                    WriteMessageToLog("Role creation is successfull for email id- " + email + "for IAC code- " + IACCode , index, ErrorType.Info);
 
                 }
                 else
                 {
-                    WriteMessageToLog("Role could not be created", index, ErrorType.Error);
+                    WriteMessageToLog("Role could not be created for email id- " + email + "for IAC code- " + IACCode , index, ErrorType.Error);
+                    IsAllTheRecordSucceeded = false;
                 }
         }
 
@@ -208,11 +263,27 @@ namespace Importer
                         if (resultobject != null)
                             if (!bool.Parse(resultobject.Value))
                             {
-                                WriteMessageToLog("Account is not mapped", index + 1, ErrorType.Error);
+                                WriteMessageToLog("Account is not mapped for email id - " + emailData, index + 1, ErrorType.Error);
                                 bool isSuccess = CreateUserAccount(firstNameColIndex, lastNameColIndex, passwordColIndex, proxyClient, doc, item, index, emailData);
                                 if (isSuccess)
                                 {
                                     var iacData = item.Split(',')[iAcColIndex];
+                                    if (iacData.Length != 0)
+                                    {
+                                        //Create user role
+                                        foreach (var iacItem in iacData.Split('|').ToList())
+                                        {
+                                            CreateRoleForUser(emailData, iacItem, proxyClient, index);
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                WriteMessageToLog("Account exists for email id - " + emailData , index + 1, ErrorType.Error);
+                                var iacData = item.Split(',')[iAcColIndex];
+                                if (iacData.Length != 0)
+                                {
                                     //Create user role
                                     foreach (var iacItem in iacData.Split('|').ToList())
                                     {
@@ -220,21 +291,11 @@ namespace Importer
                                     }
                                 }
                             }
-                            else
-                            {
-                                WriteMessageToLog("Account exists.", index + 1, ErrorType.Error);
-                                var iacData = item.Split(',')[iAcColIndex];
-                                //Create user role
-                                foreach (var iacItem in iacData.Split('|').ToList())
-                                {
-                                    CreateRoleForUser(emailData, iacItem, proxyClient, index);
-                                }
-                            }
                     }
                     catch (Exception ex)
                     {
-                        WriteMessageToLog("Could not able to proceede.Some error has occured..", index + 1,ErrorType.Error);
-                        WriteErrorMessageToLog(ex.Message,ex);
+                        WriteMessageToLog("Could not able to proceede.Some error has occured  while processing.", index + 1, ErrorType.Error);
+                        WriteErrorMessageToLog(ex.Message, ex);
                         throw ex;
                     }
 
@@ -294,12 +355,13 @@ namespace Importer
                     if (responseobject != null)
                         if (responseobject.Value == "Success")
                         {
-                            WriteMessageToLog("Account creation is successfull", index, ErrorType.Info);
+                            WriteMessageToLog("Account creation is successfull for email id- " + emailData , index, ErrorType.Info);
                             isAccountCreated = true;
                         }
                         else
                         {
-                            WriteMessageToLog("Account could not be created", index,ErrorType.Error);
+                            WriteMessageToLog("Account could not be created for email id- " + emailData , index, ErrorType.Error);
+                            IsAllTheRecordSucceeded = false;
                         }
                 }
                 catch (Exception ex)
@@ -308,7 +370,7 @@ namespace Importer
                 }
             }
             else//if any information is missing then log it.
-                WriteMessageToLog("Data is missing", index,ErrorType.Error);
+                WriteMessageToLog("Data is missing ", index, ErrorType.Error);
 
             return isAccountCreated;
         }
@@ -337,10 +399,12 @@ namespace Importer
         /// 
         private void DoFileValidation(string fileName)
         {
-            this.logger.LogInfo("File validation is being done.");
+
             if (openDialog != null && openDialog.SafeFileName.Length > 0)
             {
                 string[] totalNumberOfLines = File.ReadAllLines(fileName);
+                IsFileValid = true;
+                this.logger.LogInfo("File validation is being done.");
 
                 Records = totalNumberOfLines.ToList();
                 //Get the number of columns.
@@ -354,30 +418,19 @@ namespace Importer
                     var emailData = totalNumberOfLines[iCnt].Split(',')[emailColIndex];
                     //Check emiail validity
                     var validEmailExist = IsValidEmailAddressByRegex(emailData);
-                    if (validEmailExist)
+                    if (!validEmailExist)
                     {
-                        IsValidEmail = true;
-
-                    }
-                    else
-                    {
-                        IsValidEmail = false;
-                        WriteMessageToLog("email is not correct", iCnt,ErrorType.Error);
+                        IsFileValid = false;
+                        WriteMessageToLog("Email is not correct" + "at line number- ", iCnt, ErrorType.Error);
                         break;
                     }
-
                 }
 
-                if (IsValidEmail)
-                    IsFileValid = true;
-                else
-                    IsFileValid = false;
-
                 if (!IsFileValid)
-                    MessageBox.Show("Email data is not valid.Please check the log file created at " + AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day);
+                    MessageBox.Show("Email data is not valid.Please check the log file created at " + AppDomain.CurrentDomain.BaseDirectory);
 
                 IsFileProcessed = true;
-
+                this.logger.LogInfo("File validation is done.");
             }
             else
             {
@@ -390,15 +443,15 @@ namespace Importer
         /// </summary>
         /// <param name="message"></param>
         /// <param name="lineNumber"></param>
-        private void WriteMessageToLog(string message, int lineNumber,ErrorType errorType)
+        private void WriteMessageToLog(string message, int lineNumber, ErrorType errorType)
         {
-            switch(errorType)
+            switch (errorType)
             {
                 case ErrorType.Error:
-                    this.logger.LogError(message+" at " + lineNumber);
+                    this.logger.LogError(message + " at linenumber- " + lineNumber);
                     break;
                 case ErrorType.Info:
-                    this.logger.LogInfo(message+" at " + lineNumber);
+                    this.logger.LogInfo(message + " at linenumber- " + lineNumber);
                     break;
 
             }
@@ -412,7 +465,7 @@ namespace Importer
         private void WriteErrorMessageToLog(string msg, Exception ex)
         {
             this.logger.LogError(msg, ex);
-           // LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, message);
+            // LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, message);
         }
 
         /// <summary>
@@ -439,10 +492,10 @@ namespace Importer
         /// </summary>
         private void LogFileSetting()
         {
-            
+
             this.logger = new LogWriter(MethodBase.GetCurrentMethod().DeclaringType);
             this.logger.LogInfo("Logger started");
-          
+
         }
 
         #endregion
