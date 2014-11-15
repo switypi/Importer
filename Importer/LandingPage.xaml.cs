@@ -41,6 +41,7 @@ namespace Importer
         public LandingPage()
         {
             InitializeComponent();
+            //Write log setting(initial setting values)
             LogFileSetting();
 
         }
@@ -157,6 +158,7 @@ namespace Importer
         /// <param name="e"></param>
         private void backgroundThread_DoWork(object sender, DoWorkEventArgs e)
         {
+            //Start file validation(if not done through validate button) and processing.
             if (!IsFileProcessed)
                 DoFileValidation(openDialog.FileName);
             if (IsFileValid)
@@ -173,6 +175,7 @@ namespace Importer
         private void backgroundThread_RunEmailValidationCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             busyIndicator.IsBusy = false;
+            //Un-subscribe the background thread events
             backgroundThread.DoWork -= backgroundThread_DoEmailValidation;
             backgroundThread.RunWorkerCompleted -= backgroundThread_RunEmailValidationCompleted;
         }
@@ -184,6 +187,7 @@ namespace Importer
         /// <param name="e"></param>
         private void backgroundThread_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            //Set the busy indicator.
             busyIndicator.IsBusy = false;
             if (IsFileValid)
             {
@@ -200,8 +204,10 @@ namespace Importer
                 }
 
             }
+            //Reset the open diallog box.
             openDialog.Reset();
-            txtFileName.Text = string.Empty;
+            txtFileName.Text = string.Empty;//Reset the filename.
+            //Un-subscribe the background thread events
             backgroundThread.DoWork -= backgroundThread_DoWork;
             backgroundThread.RunWorkerCompleted -= backgroundThread_RunWorkerCompleted;
         }
@@ -217,7 +223,7 @@ namespace Importer
             XElement doc = XElement.Parse(response);
             var responseobject = doc.Elements().FirstOrDefault(c => c.Name.LocalName == "ResultCode");
             if (responseobject != null)
-                if (responseobject.Value == "0")
+                if (responseobject.Value == "0")//for valid operation.result code =0
                 {
                     WriteMessageToLog("Role creation is successfull for email id- " + email + "for IAC code- " + IACCode , index, ErrorType.Info);
 
@@ -250,7 +256,7 @@ namespace Importer
                 int index = Records.IndexOf(item);
                 if (index != 0)//leave 0th line as that is for column header.
                 {
-
+                    //Get the email id.
                     var emailData = item.Split(',')[emailColIndex];
 
                     string service = accountCheckService + emailData + "," + keyForService;
@@ -273,6 +279,7 @@ namespace Importer
                                         //Create user role
                                         foreach (var iacItem in iacData.Split('|').ToList())
                                         {
+                                            //Create the Role for valid account and emailID.
                                             CreateRoleForUser(emailData, iacItem, proxyClient, index);
                                         }
                                     }
@@ -475,8 +482,9 @@ namespace Importer
         /// <returns></returns>
         public bool IsValidEmailAddressByRegex(string mailAddress)
         {
-            Regex mailIDPattern = new Regex(@"[\w-]+@([\w-]+\.)+[\w-]+");
+            Regex mailIDPattern = new Regex(@"[\w-]+@([\w-]+\.)+[\w-]+");//Regular expression to check email id is valid or not.
 
+            //Check whether mail id is valid.
             if (!string.IsNullOrEmpty(mailAddress) && mailIDPattern.IsMatch(mailAddress))
             {
                 return true;
@@ -492,7 +500,7 @@ namespace Importer
         /// </summary>
         private void LogFileSetting()
         {
-
+            //Create the logger file.
             this.logger = new LogWriter(MethodBase.GetCurrentMethod().DeclaringType);
             this.logger.LogInfo("Logger started");
 
