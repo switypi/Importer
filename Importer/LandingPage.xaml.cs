@@ -101,8 +101,9 @@ namespace Importer
         /// <param name="e"></param>
         private void btnValidate_Click(object sender, RoutedEventArgs e)
         {
-            if (openDialog != null && openDialog.FileName != "")
+            if (openDialog != null && openDialog.FileName.Length > 0)
             {
+                //Starting a background process
                 if (backgroundThread == null)
                     backgroundThread = new BackgroundWorker();
                 backgroundThread.DoWork += backgroundThread_DoEmailValidation;
@@ -145,7 +146,7 @@ namespace Importer
         /// <param name="e"></param>
         private void backgroundThread_DoEmailValidation(object sender, DoWorkEventArgs e)
         {
-            if (openDialog != null)
+            if (openDialog != null && openDialog.FileName.Length > 0)
                 DoFileValidation(openDialog.FileName);
             else
                 MessageBox.Show("Please select a file to validate.");
@@ -191,10 +192,10 @@ namespace Importer
             busyIndicator.IsBusy = false;
             if (IsFileValid)
             {
-                if (e.Error == null && IsAllTheRecordSucceeded==true)
+                if (e.Error == null && IsAllTheRecordSucceeded == true)
                     MessageBox.Show("Import successful.");
-                    else if(e.Error == null && IsAllTheRecordSucceeded==false)
-                    MessageBox.Show("All records could not be processed successfully."+Environment.NewLine+" Please check log file created at " + AppDomain.CurrentDomain.BaseDirectory);
+                else if (e.Error == null && IsAllTheRecordSucceeded == false)
+                    MessageBox.Show("All records could not be processed successfully." + Environment.NewLine + " Please check log file created at " + AppDomain.CurrentDomain.BaseDirectory);
                 else
                 {
 
@@ -225,12 +226,12 @@ namespace Importer
             if (responseobject != null)
                 if (responseobject.Value == "0")//for valid operation.result code =0
                 {
-                    WriteMessageToLog("Role creation is successfull for email id- " + email + "for IAC code- " + IACCode , index, ErrorType.Info);
+                    WriteMessageToLog("Role creation is successfull for email id- " + email + "for IAC code- " + IACCode, index, ErrorType.Info);
 
                 }
                 else
                 {
-                    WriteMessageToLog("Role could not be created for email id- " + email + "for IAC code- " + IACCode , index, ErrorType.Error);
+                    WriteMessageToLog("Role could not be created for email id- " + email + "for IAC code- " + IACCode, index, ErrorType.Error);
                     IsAllTheRecordSucceeded = false;
                 }
         }
@@ -287,7 +288,7 @@ namespace Importer
                             }
                             else
                             {
-                                WriteMessageToLog("Account exists for email id - " + emailData , index + 1, ErrorType.Error);
+                                WriteMessageToLog("Account exists for email id - " + emailData, index + 1, ErrorType.Error);
                                 var iacData = item.Split(',')[iAcColIndex];
                                 if (iacData.Length != 0)
                                 {
@@ -362,12 +363,12 @@ namespace Importer
                     if (responseobject != null)
                         if (responseobject.Value == "Success")
                         {
-                            WriteMessageToLog("Account creation is successfull for email id- " + emailData , index, ErrorType.Info);
+                            WriteMessageToLog("Account creation is successfull for email id- " + emailData, index, ErrorType.Info);
                             isAccountCreated = true;
                         }
                         else
                         {
-                            WriteMessageToLog("Account could not be created for email id- " + emailData , index, ErrorType.Error);
+                            WriteMessageToLog("Account could not be created for email id- " + emailData, index, ErrorType.Error);
                             IsAllTheRecordSucceeded = false;
                         }
                 }
@@ -380,22 +381,6 @@ namespace Importer
                 WriteMessageToLog("Data is missing ", index, ErrorType.Error);
 
             return isAccountCreated;
-        }
-
-        /// <summary>
-        /// Add permission to user.
-        /// </summary>
-        /// <param name="lineNumber"></param>
-        private void AddPermission(int lineNumber)
-        {
-            try
-            {
-
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
         }
 
         /// <summary>
@@ -434,14 +419,14 @@ namespace Importer
                 }
 
                 if (!IsFileValid)
-                    MessageBox.Show("Email data is not valid.Please check the log file created at " + AppDomain.CurrentDomain.BaseDirectory);
+                    MessageBox.Show("Email is not valid.Please check the log file created at " + AppDomain.CurrentDomain.BaseDirectory);
 
                 IsFileProcessed = true;
-                this.logger.LogInfo("File validation is done.");
+                this.logger.LogInfo("File validation is complete.Check the log file for information");
             }
             else
             {
-                MessageBox.Show("Please select a file to validate.");
+                MessageBox.Show("Please select a file.");
             }
         }
 
@@ -460,9 +445,7 @@ namespace Importer
                 case ErrorType.Info:
                     this.logger.LogInfo(message + " at linenumber- " + lineNumber);
                     break;
-
             }
-            //this.logger..WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, lineNumber != 0 ? "Line " + lineNumber + ": " + message : "");
         }
 
         /// <summary>
@@ -472,7 +455,6 @@ namespace Importer
         private void WriteErrorMessageToLog(string msg, Exception ex)
         {
             this.logger.LogError(msg, ex);
-            // LogWriter.WriteLog(AppDomain.CurrentDomain.BaseDirectory + DateTime.Now.Year + "-" + DateTime.Now.Month + "-" + DateTime.Now.Day, message);
         }
 
         /// <summary>
