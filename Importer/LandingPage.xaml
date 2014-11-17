@@ -14,7 +14,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"></RowDefinition>
                 <RowDefinition Height="Auto"></RowDefinition>
-            </Grid.RowDefinitions>
+            </Grid.RowDefinitions> 
             <TextBlock Text="Select a csv file" VerticalAlignment="Center" Margin="10,0,0,0"></TextBlock>
             <StackPanel Orientation="Horizontal" Grid.Column="1" Margin="10,0,10,0">
                 <TextBox x:Name="txtFileName"  Height="30" Width="200"></TextBox>
