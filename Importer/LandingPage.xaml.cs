@@ -247,6 +247,9 @@ namespace Importer
             int lastNameColIndex = -1;
             int passwordColIndex = -1;
             int iAcColIndex = -1;
+            int iCountryColIndex = -1;
+            int iStateColIndex = -1;
+            int iSchoolColIndex = -1;
 
             string[] columns;
 
@@ -271,7 +274,8 @@ namespace Importer
                             if (!bool.Parse(resultobject.Value))
                             {
                                 WriteMessageToLog("Account is not mapped for email id - " + emailData, index + 1, ErrorType.Error);
-                                bool isSuccess = CreateUserAccount(firstNameColIndex, lastNameColIndex, passwordColIndex, proxyClient, doc, item, index, emailData);
+                                bool isSuccess = CreateUserAccount(firstNameColIndex, lastNameColIndex, passwordColIndex, iCountryColIndex, iStateColIndex, iSchoolColIndex,
+                                    proxyClient, doc, item, index, emailData);
                                 if (isSuccess)
                                 {
                                     var iacData = item.Split(',')[iAcColIndex];
@@ -314,6 +318,7 @@ namespace Importer
                     columns = item.Split(';');
                     var emailCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Email", StringComparison.InvariantCultureIgnoreCase));
                     emailColIndex = columns[0].Split(',').ToList().IndexOf(emailCol);
+
                     var firstNameCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("First Name", StringComparison.InvariantCultureIgnoreCase));
                     firstNameColIndex = columns[0].Split(',').ToList().IndexOf(firstNameCol);
 
@@ -325,6 +330,17 @@ namespace Importer
 
                     var iAcCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("IAC", StringComparison.InvariantCultureIgnoreCase));
                     iAcColIndex = columns[0].Split(',').ToList().IndexOf(iAcCol);
+
+                    var iCountryCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Country", StringComparison.InvariantCultureIgnoreCase));
+                    iCountryColIndex = columns[0].Split(',').ToList().IndexOf(iCountryCol);
+
+                    var iStateCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("State", StringComparison.InvariantCultureIgnoreCase));
+                    iStateColIndex = columns[0].Split(',').ToList().IndexOf(iStateCol);
+
+                    var iSchoolCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("School", StringComparison.InvariantCultureIgnoreCase));
+                    iSchoolColIndex = columns[0].Split(',').ToList().IndexOf(iSchoolCol);
+
+
 
                 }
             }
@@ -342,20 +358,35 @@ namespace Importer
         /// <param name="index"></param>
         /// <param name="emailData"></param>
         /// <returns></returns>
-        private bool CreateUserAccount(int firstNameColIndex, int lastNameColIndex, int passwordColIndex, WebClient proxyClient, XElement doc, string item, int index, string emailData)
+        private bool CreateUserAccount(int firstNameColIndex, int lastNameColIndex, int passwordColIndex, int iCountryColIndex, int iStateColIndex, int iSchoolColIndex,
+            WebClient proxyClient, XElement doc,
+            string item, int index, string emailData)
         {
             bool isAccountCreated = false;
             //Check first name ,last name
             var firstName = item.Split(',')[firstNameColIndex];
             var lastName = item.Split(',')[lastNameColIndex];
             var Password = item.Split(',')[passwordColIndex];
+            var Country = item.Split(',')[iCountryColIndex];
+            var State = item.Split(',')[iStateColIndex];
+            var School = item.Split(',')[iSchoolColIndex];
+
 
             //If all the information is present then go ahead and create the account.
             if (string.IsNullOrEmpty(firstName) == false && string.IsNullOrEmpty(lastName) == false && string.IsNullOrEmpty(Password) == false)
             {
                 try
                 {
-                    string userAccounService = accountCreationService + emailData + "," + Password + "," + firstName + "," + lastName + "," + keyForService;
+                    //Get Country and State.
+
+                    string retrivedCountry = Utility.ConvertToCountry(Country).ToString();
+                    string retrivedState = Utility.ConvertToCountry(State).ToString();
+
+                    if (retrivedCountry == "NA" || retrivedState == "NA")
+                        WriteMessageToLog("Country or State name is not valid- ", index, ErrorType.Info);
+
+
+                    string userAccounService = accountCreationService + emailData + "," + Password + "," + firstName + "," + lastName + "," + retrivedCountry + "," + retrivedState + "," + School + "," + keyForService;
                     var accountData = proxyClient.DownloadString(userAccounService);
 
                     doc = XElement.Parse(accountData);
