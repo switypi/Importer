@@ -340,8 +340,6 @@ namespace Importer
                     var iSchoolCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("School", StringComparison.InvariantCultureIgnoreCase));
                     iSchoolColIndex = columns[0].Split(',').ToList().IndexOf(iSchoolCol);
 
-
-
                 }
             }
         }
@@ -363,7 +361,7 @@ namespace Importer
             string item, int index, string emailData)
         {
             bool isAccountCreated = false;
-            //Check first name ,last name
+            //Get first name ,last name etc
             var firstName = item.Split(',')[firstNameColIndex];
             var lastName = item.Split(',')[lastNameColIndex];
             var Password = item.Split(',')[passwordColIndex];
@@ -385,6 +383,12 @@ namespace Importer
                     if (retrivedCountry == "NA" || retrivedState == "NA")
                         WriteMessageToLog("Country or State name is not valid- ", index, ErrorType.Info);
 
+                    if (string.IsNullOrEmpty(Password))
+                    {
+                        WriteMessageToLog("Password is empty.Generating new password.-", index, ErrorType.Info);
+                        string generatedPassword = Utility.GeneratePassword(8);
+                        Password = generatedPassword;
+                    }
 
                     string userAccounService = accountCreationService + emailData + "," + Password + "," + firstName + "," + lastName + "," + retrivedCountry + "," + retrivedState + "," + School + "," + keyForService;
                     var accountData = proxyClient.DownloadString(userAccounService);
@@ -395,7 +399,7 @@ namespace Importer
                         if (responseobject.Value == "Success")
                         {
                             WriteMessageToLog("Account creation is successfull for email id- " + emailData, index, ErrorType.Info);
-                            isAccountCreated = true;
+                            isAccountCreated = true;   
                         }
                         else
                         {
