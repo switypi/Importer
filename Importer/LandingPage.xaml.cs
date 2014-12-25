@@ -379,9 +379,7 @@ namespace Importer
 
                     string retrivedCountry = Utility.ConvertToCountry(Country).ToString();
                     string retrivedState = Utility.ConvertToCountry(State).ToString();
-
-                    if (retrivedCountry == "NA" || retrivedState == "NA")
-                        WriteMessageToLog("Country or State name is not valid- ", index, ErrorType.Info);
+                  
 
                     if (string.IsNullOrEmpty(Password))
                     {
@@ -399,7 +397,7 @@ namespace Importer
                         if (responseobject.Value == "Success")
                         {
                             WriteMessageToLog("Account creation is successfull for email id- " + emailData, index, ErrorType.Info);
-                            isAccountCreated = true;   
+                            isAccountCreated = true;
                         }
                         else
                         {
@@ -439,10 +437,25 @@ namespace Importer
                 //
                 var emailCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Email"));
                 var emailColIndex = columns[0].Split(',').ToList().IndexOf(emailCol);
+                var iCOuntryCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Country"));
+                var iCOuntryIndex = columns[0].Split(',').ToList().IndexOf(iCOuntryCol);
+                var iStateCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("State"));
+                var iStateIndex = columns[0].Split(',').ToList().IndexOf(iStateCol);
                 //Reading corresponding data for email column
                 for (int iCnt = 1; iCnt < totalNumberOfLines.Count(); iCnt++)
                 {
                     var emailData = totalNumberOfLines[iCnt].Split(',')[emailColIndex];
+                    var country = totalNumberOfLines[iCnt].Split(',')[iCOuntryIndex];
+                    var state = totalNumberOfLines[iCnt].Split(',')[iStateIndex];
+
+                    string retrivedCountry = Utility.ConvertToCountry(country).ToString();
+                    string retrivedState = Utility.ConvertToCountry(state).ToString();
+
+                    if (retrivedCountry == "NA" || retrivedState == "NA")
+                    {
+                        WriteMessageToLog("Country or State name is not valid- ", iCnt, ErrorType.Info);
+                        IsFileValid = false;
+                    }
                     //Check emiail validity
                     var validEmailExist = IsValidEmailAddressByRegex(emailData);
                     if (!validEmailExist)
@@ -454,7 +467,7 @@ namespace Importer
                 }
 
                 if (!IsFileValid)
-                    MessageBox.Show("Email is not valid.Please check the log file created at " + AppDomain.CurrentDomain.BaseDirectory);
+                    MessageBox.Show("File is not valid.Check Email format,Country and State. Please check the log file created at " + AppDomain.CurrentDomain.BaseDirectory);
 
                 IsFileProcessed = true;
                 this.logger.LogInfo("File validation is complete.Check the log file for information");
