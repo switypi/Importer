@@ -67,6 +67,8 @@ namespace Importer
 
         private bool IsAllTheRecordSucceeded { get; set; }
 
+        private List<string> Lines { get; set; }
+
         #endregion
 
         #region Methods
@@ -176,9 +178,18 @@ namespace Importer
         private void backgroundThread_RunEmailValidationCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             busyIndicator.IsBusy = false;
+
             //Un-subscribe the background thread events
             backgroundThread.DoWork -= backgroundThread_DoEmailValidation;
             backgroundThread.RunWorkerCompleted -= backgroundThread_RunEmailValidationCompleted;
+
+            if (!IsFileValid)
+            {
+                //File.Create(openDialog.FileName + "-Result");
+                string fileName = System.IO.Path.GetFileNameWithoutExtension(openDialog.FileName);
+                string directory = openDialog.InitialDirectory;
+                File.WriteAllLines(openDialog.FileName, Lines);
+            }
         }
 
         /// <summary>
@@ -431,6 +442,7 @@ namespace Importer
                 this.logger.LogInfo("File validation is being done.");
 
                 Records = totalNumberOfLines.ToList();
+                Lines = new List<string>();
                 //Get the number of columns.
                 string[] columns = totalNumberOfLines[0].Split(';');
                 //
@@ -444,7 +456,12 @@ namespace Importer
                 var iFirstNameIndex = columns[0].Split(',').ToList().IndexOf(iFrstNameCol);
                 var iLstNameCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Last Name"));
                 var iLastNameIndex = columns[0].Split(',').ToList().IndexOf(iLstNameCol);
+
+                var ipwdCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Password"));
+                var iPwdIndex = columns[0].Split(',').ToList().IndexOf(ipwdCol);
+
                 //Reading corresponding data for email column
+                Lines.Add(totalNumberOfLines[0]);//write headers
                 for (int iCnt = 1; iCnt < totalNumberOfLines.Count(); iCnt++)
                 {
                     var emailData = totalNumberOfLines[iCnt].Split(',')[emailColIndex];
@@ -455,26 +472,58 @@ namespace Importer
                     string retrivedState = Utility.ConvertToState(state).ToString();
                     string firstName = totalNumberOfLines[iCnt].Split(',')[iFirstNameIndex];
                     string lastName = totalNumberOfLines[iCnt].Split(',')[iLastNameIndex];
+                    string Password = totalNumberOfLines[iCnt].Split(',')[iPwdIndex]; //item.Split(',')[passwordColIndex];
+
 
                     if (retrivedCountry == "NA" || retrivedState == "NA")
                     {
-                        WriteMessageToLog("Country or State name is not valid- ", iCnt+1, ErrorType.Info);
+                        WriteMessageToLog("Country or State name is not valid- ", iCnt + 1, ErrorType.Info);
                         IsFileValid = false;
                     }
 
                     if (string.IsNullOrEmpty(firstName) == true || string.IsNullOrEmpty(lastName) == true)
                     {
-                        WriteMessageToLog("First Name or Last name is not valid- ", iCnt+1, ErrorType.Info);
+                        WriteMessageToLog("First Name or Last name is not valid- ", iCnt + 1, ErrorType.Info);
                         IsFileValid = false;
                     }
+
+
+
                     //Check emiail validity
                     var validEmailExist = IsValidEmailAddressByRegex(emailData);
                     if (!validEmailExist)
                     {
                         IsFileValid = false;
-                        WriteMessageToLog("Email is not correct" + "at line number- ", iCnt+1, ErrorType.Error);
-                        break;
+                        WriteMessageToLog("Email is not correct" + "at line number- ", iCnt + 1, ErrorType.Error);
+
                     }
+
+                    if (string.IsNullOrEmpty(Password))
+                    {
+                        WriteMessageToLog("Password is empty.Generating new password.-", iCnt + 1, ErrorType.Info);
+                        string generatedPassword = Utility.GeneratePassword(8);
+                        Password = generatedPassword;
+
+                        var list = totalNumberOfLines[iCnt].Split(',').ToList();
+
+                        list.RemoveAt(iPwdIndex);
+                        list.Insert(iPwdIndex, Password);
+                        var index = list.Count() - 1;
+                        string itemToBeWritten = string.Empty;
+                        list.ForEach(c =>
+                        {
+                            if (list.IndexOf(c) != index)
+                                itemToBeWritten = itemToBeWritten + c + ",";
+                            else
+                                itemToBeWritten = itemToBeWritten + c;
+
+                        });
+
+                        Lines.Add(itemToBeWritten);
+                    }
+                    else
+                        Lines.Add(totalNumberOfLines[iCnt]);
+
                 }
 
                 if (!IsFileValid)
