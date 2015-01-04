@@ -69,6 +69,8 @@ namespace Importer
 
         private List<string> Lines { get; set; }
 
+        private Random Rnd { get; set; }
+
         #endregion
 
         #region Methods
@@ -443,6 +445,7 @@ namespace Importer
 
                 Records = totalNumberOfLines.ToList();
                 Lines = new List<string>();
+                Rnd = new Random(1);
                 //Get the number of columns.
                 string[] columns = totalNumberOfLines[0].Split(';');
                 //
@@ -501,9 +504,9 @@ namespace Importer
                     if (string.IsNullOrEmpty(Password))
                     {
                         WriteMessageToLog("Password is empty.Generating new password.-", iCnt + 1, ErrorType.Info);
-                        string generatedPassword = Utility.GeneratePassword(8);
+                        string generatedPassword = GeneratePassword(8);
                         Password = generatedPassword;
-
+                        
                         var list = totalNumberOfLines[iCnt].Split(',').ToList();
 
                         list.RemoveAt(iPwdIndex);
@@ -594,6 +597,21 @@ namespace Importer
             this.logger = new LogWriter(MethodBase.GetCurrentMethod().DeclaringType);
             this.logger.LogInfo("Logger started");
 
+        }
+
+        public string GeneratePassword(int passwordLength)
+        {
+            string allowedChars = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNOPQRSTUVWXYZ0123456789!@$?_-";
+            //char[] chars = new char[passwordLength];
+            string returnVal = string.Empty;
+
+
+            for (int i = 0; i < passwordLength; i++)
+            {
+                returnVal = returnVal + allowedChars[Rnd.Next(0, allowedChars.Length)].ToString();
+            }
+
+            return returnVal;
         }
 
         #endregion
