@@ -43,6 +43,7 @@ namespace Importer
             InitializeComponent();
             //Write log setting(initial setting values)
             LogFileSetting();
+            btnProcess.IsEnabled = false;
 
         }
         #endregion
@@ -110,8 +111,8 @@ namespace Importer
                 //Starting a background process
                 if (backgroundThread == null)
                     backgroundThread = new BackgroundWorker();
-                backgroundThread.DoWork += backgroundThread_DoEmailValidation;
-                backgroundThread.RunWorkerCompleted += backgroundThread_RunEmailValidationCompleted;
+                backgroundThread.DoWork += backgroundThread_DoValidation;
+                backgroundThread.RunWorkerCompleted += backgroundThread_RunValidationCompleted;
                 backgroundThread.RunWorkerAsync();
                 busyIndicator.IsBusy = true;
             }
@@ -148,7 +149,7 @@ namespace Importer
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void backgroundThread_DoEmailValidation(object sender, DoWorkEventArgs e)
+        private void backgroundThread_DoValidation(object sender, DoWorkEventArgs e)
         {
             if (openDialog != null && openDialog.FileName.Length > 0)
                 DoFileValidation(openDialog.FileName);
@@ -164,8 +165,8 @@ namespace Importer
         private void backgroundThread_DoWork(object sender, DoWorkEventArgs e)
         {
             //Start file validation(if not done through validate button) and processing.
-            if (!IsFileProcessed)
-                DoFileValidation(openDialog.FileName);
+            //if (!IsFileProcessed)
+            //    DoFileValidation(openDialog.FileName);
             if (IsFileValid)
             {
                 ProcessRecordsInFile();
@@ -177,21 +178,22 @@ namespace Importer
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void backgroundThread_RunEmailValidationCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void backgroundThread_RunValidationCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             busyIndicator.IsBusy = false;
 
             //Un-subscribe the background thread events
-            backgroundThread.DoWork -= backgroundThread_DoEmailValidation;
-            backgroundThread.RunWorkerCompleted -= backgroundThread_RunEmailValidationCompleted;
+            backgroundThread.DoWork -= backgroundThread_DoValidation;
+            backgroundThread.RunWorkerCompleted -= backgroundThread_RunValidationCompleted;
 
             if (!IsFileValid)
             {
                 //File.Create(openDialog.FileName + "-Result");
-                string fileName = System.IO.Path.GetFileNameWithoutExtension(openDialog.FileName);
-                string directory = openDialog.InitialDirectory;
+                btnProcess.IsEnabled = false;
                 File.WriteAllLines(openDialog.FileName, Lines);
             }
+            else
+                btnProcess.IsEnabled = true;
         }
 
         /// <summary>
@@ -220,6 +222,7 @@ namespace Importer
             }
             //Reset the open diallog box.
             openDialog.Reset();
+            btnProcess.IsEnabled = false;
             txtFileName.Text = string.Empty;//Reset the filename.
             //Un-subscribe the background thread events
             backgroundThread.DoWork -= backgroundThread_DoWork;
@@ -506,7 +509,7 @@ namespace Importer
                         WriteMessageToLog("Password is empty.Generating new password.-", iCnt + 1, ErrorType.Info);
                         string generatedPassword = GeneratePassword(8);
                         Password = generatedPassword;
-                        
+
                         var list = totalNumberOfLines[iCnt].Split(',').ToList();
 
                         list.RemoveAt(iPwdIndex);
