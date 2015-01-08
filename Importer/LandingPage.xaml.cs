@@ -43,12 +43,13 @@ namespace Importer
             InitializeComponent();
             //Write log setting(initial setting values)
             LogFileSetting();
-            btnProcess.IsEnabled = false;
+            // btnProcess.IsEnabled = false;
 
         }
         #endregion
 
         #region Properties
+        private bool IsErrorOccured { get; set; }
         /// <summary>
         /// Is file valid to process
         /// </summary>
@@ -152,7 +153,7 @@ namespace Importer
         private void backgroundThread_DoValidation(object sender, DoWorkEventArgs e)
         {
             if (openDialog != null && openDialog.FileName.Length > 0)
-                DoFileValidation(openDialog.FileName);
+                DoFileValidation(openDialog.FileName, false);
             else
                 MessageBox.Show("Please select a file to validate.");
         }
@@ -165,12 +166,21 @@ namespace Importer
         private void backgroundThread_DoWork(object sender, DoWorkEventArgs e)
         {
             //Start file validation(if not done through validate button) and processing.
-            //if (!IsFileProcessed)
-            //    DoFileValidation(openDialog.FileName);
-            if (IsFileValid)
+            if (!IsFileProcessed)
+                DoFileValidation(openDialog.FileName, true);
+            MessageBoxResult res = MessageBoxResult.OK;
+            if (!IsFileValid)
             {
-                ProcessRecordsInFile();
+                res = MessageBox.Show("File is not valid.Would you like to continue?", "", MessageBoxButton.OKCancel);
             }
+            if (res == MessageBoxResult.OK)
+                ProcessRecordsInFile();
+            if (IsErrorOccured)
+                MessageBox.Show("Error has occured while processing the file.");
+            else
+                MessageBox.Show("The selected file has been processed successfully.");
+
+
         }
 
         /// <summary>
@@ -189,11 +199,11 @@ namespace Importer
             if (!IsFileValid)
             {
                 //File.Create(openDialog.FileName + "-Result");
-                btnProcess.IsEnabled = false;
+                //btnProcess.IsEnabled = false;
                 File.WriteAllLines(openDialog.FileName, Lines);
             }
-            else
-                btnProcess.IsEnabled = true;
+            //else
+            //btnProcess.IsEnabled = true;
         }
 
         /// <summary>
@@ -222,7 +232,7 @@ namespace Importer
             }
             //Reset the open diallog box.
             openDialog.Reset();
-            btnProcess.IsEnabled = false;
+            //btnProcess.IsEnabled = false;
             txtFileName.Text = string.Empty;//Reset the filename.
             //Un-subscribe the background thread events
             backgroundThread.DoWork -= backgroundThread_DoWork;
@@ -271,6 +281,13 @@ namespace Importer
 
             WebClient proxyClient = new WebClient(); ;
             XElement doc;
+
+            
+            this.logger.LogInfo(Environment.NewLine);
+            this.logger.LogInfo("File processing is being done.");
+
+            IsErrorOccured = false;
+
             foreach (var item in Records)
             {
                 int index = Records.IndexOf(item);
@@ -324,37 +341,49 @@ namespace Importer
                     {
                         WriteMessageToLog("Could not able to proceede.Some error has occured  while processing.", index + 1, ErrorType.Error);
                         WriteErrorMessageToLog(ex.Message, ex);
-                        throw ex;
+                        IsErrorOccured = true;
+                        //MessageBox.Show(ex.Message);
+                        //throw ex;
                     }
 
                 }
                 else
                 {
                     //Get the header column index of each column.
-                    columns = item.Split(';');
-                    var emailCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Email", StringComparison.InvariantCultureIgnoreCase));
-                    emailColIndex = columns[0].Split(',').ToList().IndexOf(emailCol);
+                    try
+                    {
 
-                    var firstNameCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("First Name", StringComparison.InvariantCultureIgnoreCase));
-                    firstNameColIndex = columns[0].Split(',').ToList().IndexOf(firstNameCol);
+                        columns = item.Split(';');
+                        var emailCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Email", StringComparison.InvariantCultureIgnoreCase));
+                        emailColIndex = columns[0].Split(',').ToList().IndexOf(emailCol);
 
-                    var lastNameCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Last Name", StringComparison.InvariantCultureIgnoreCase));
-                    lastNameColIndex = columns[0].Split(',').ToList().IndexOf(lastNameCol);
+                        var firstNameCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("First Name", StringComparison.InvariantCultureIgnoreCase));
+                        firstNameColIndex = columns[0].Split(',').ToList().IndexOf(firstNameCol);
 
-                    var passwordCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Password", StringComparison.InvariantCultureIgnoreCase));
-                    passwordColIndex = columns[0].Split(',').ToList().IndexOf(passwordCol);
+                        var lastNameCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Last Name", StringComparison.InvariantCultureIgnoreCase));
+                        lastNameColIndex = columns[0].Split(',').ToList().IndexOf(lastNameCol);
 
-                    var iAcCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("IAC", StringComparison.InvariantCultureIgnoreCase));
-                    iAcColIndex = columns[0].Split(',').ToList().IndexOf(iAcCol);
+                        var passwordCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Password", StringComparison.InvariantCultureIgnoreCase));
+                        passwordColIndex = columns[0].Split(',').ToList().IndexOf(passwordCol);
 
-                    var iCountryCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Country", StringComparison.InvariantCultureIgnoreCase));
-                    iCountryColIndex = columns[0].Split(',').ToList().IndexOf(iCountryCol);
+                        var iAcCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("IAC", StringComparison.InvariantCultureIgnoreCase));
+                        iAcColIndex = columns[0].Split(',').ToList().IndexOf(iAcCol);
 
-                    var iStateCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("State", StringComparison.InvariantCultureIgnoreCase));
-                    iStateColIndex = columns[0].Split(',').ToList().IndexOf(iStateCol);
+                        var iCountryCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("Country", StringComparison.InvariantCultureIgnoreCase));
+                        iCountryColIndex = columns[0].Split(',').ToList().IndexOf(iCountryCol);
 
-                    var iSchoolCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("School", StringComparison.InvariantCultureIgnoreCase));
-                    iSchoolColIndex = columns[0].Split(',').ToList().IndexOf(iSchoolCol);
+                        var iStateCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("State", StringComparison.InvariantCultureIgnoreCase));
+                        iStateColIndex = columns[0].Split(',').ToList().IndexOf(iStateCol);
+
+                        var iSchoolCol = columns[0].Split(',').FirstOrDefault(x => x.StartsWith("School", StringComparison.InvariantCultureIgnoreCase));
+                        iSchoolColIndex = columns[0].Split(',').ToList().IndexOf(iSchoolCol);
+                    }
+                    catch (Exception ex)
+                    {
+                        IsErrorOccured = true;
+                        WriteErrorMessageToLog(ex.Message, ex);
+                        throw ex;
+                    }
 
                 }
             }
@@ -437,7 +466,7 @@ namespace Importer
         /// <param name="sender"></param>
         /// <param name="e"></param>
         /// 
-        private void DoFileValidation(string fileName)
+        private void DoFileValidation(string fileName, bool isInvokedFromProcess)
         {
 
             if (openDialog != null && openDialog.SafeFileName.Length > 0)
@@ -480,7 +509,6 @@ namespace Importer
                     string lastName = totalNumberOfLines[iCnt].Split(',')[iLastNameIndex];
                     string Password = totalNumberOfLines[iCnt].Split(',')[iPwdIndex]; //item.Split(',')[passwordColIndex];
 
-
                     if (retrivedCountry == "NA" || retrivedState == "NA")
                     {
                         WriteMessageToLog("Country or State name is not valid- ", iCnt + 1, ErrorType.Info);
@@ -492,8 +520,6 @@ namespace Importer
                         WriteMessageToLog("First Name or Last name is not valid- ", iCnt + 1, ErrorType.Info);
                         IsFileValid = false;
                     }
-
-
 
                     //Check emiail validity
                     var validEmailExist = IsValidEmailAddressByRegex(emailData);
@@ -532,11 +558,11 @@ namespace Importer
 
                 }
 
-                if (!IsFileValid)
+                if (!IsFileValid && isInvokedFromProcess == false)
                     MessageBox.Show("File is not valid.Please check the log file created at " + AppDomain.CurrentDomain.BaseDirectory);
 
                 IsFileProcessed = true;
-                this.logger.LogInfo("File validation is complete.Check the log file for information");
+                this.logger.LogInfo("File validation is complete.");
             }
             else
             {

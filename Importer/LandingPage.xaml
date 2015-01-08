@@ -28,7 +28,7 @@
 
         </Grid>
 
-        <xctk:BusyIndicator x:Name="busyIndicator"  >
+        <xctk:BusyIndicator x:Name="busyIndicator"  Foreground="Red"   >
         </xctk:BusyIndicator>
     </Grid>
 </Window>
